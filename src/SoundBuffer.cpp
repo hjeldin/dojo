@@ -149,7 +149,7 @@ bool SoundBuffer::Chunk::onLoad()
 	CHECK_AL_ERROR;
     
     //copy the source to avoid side-effects
-    std::unique_ptr< Stream > source( pParent->mSource->copy() );
+    Unique< Stream > source( pParent->mSource->copy() );
     
     source->open();
 
@@ -220,7 +220,7 @@ void SoundBuffer::Chunk::loadAsync()
 	++references; //grab a reference and release to be sure that the chunk is not destroyed while loading
 
 	//async load
-	Platform::getSingleton()->getBackgroundQueue()->queueTask([&]()
+	Platform::singleton().getBackgroundQueue()->queueTask([&]()
 	{
 		onLoad();
 
@@ -321,7 +321,7 @@ bool SoundBuffer::_loadOgg( Stream* source )
 
 bool SoundBuffer::_loadOggFromFile()
 {
-	mFile = Platform::getSingleton()->getFile( filePath );
+	mFile = Platform::singleton().getFile( filePath );
 	mSource = mFile.get();
 	
 	_loadOgg( mSource );

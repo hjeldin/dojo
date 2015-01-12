@@ -20,7 +20,7 @@ BackgroundQueue::BackgroundQueue( int poolSize /* = -1 */ ) :
 
 	//create the thread pool
 	for( int i = 0; i < poolSize; ++i )
-		mWorkers.push_back( std::unique_ptr<Worker>(new Worker(this)) );
+		mWorkers.push_back( Unique<Worker>(new Worker(this)) );
 }
 
 void BackgroundQueue::queueTask( const Task& task, const Callback& callback )
@@ -59,7 +59,7 @@ pParent(parent)
 
 	thread = std::thread([&]()
 	{
-		Platform::getSingleton()->prepareThreadContext();
+		Platform::singleton().prepareThreadContext();
 
 		while( 1 )
 		{

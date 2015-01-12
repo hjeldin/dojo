@@ -7,7 +7,7 @@
 namespace Dojo 
 {
 	class SoundManager;
-	class Render;
+	class Renderer;
 	class InputSystem;
 	class FontSystem;
 	class Game;
@@ -22,29 +22,29 @@ namespace Dojo
 	{
 	public:
 
-		typedef std::unique_ptr< FileStream > FilePtr;
+		typedef Unique< FileStream > FilePtr;
 
 		///creates the Platform
 		/**
 		\param config pass a non-empty Table to override the loading from the Platform User Configuration table, found in APPDATA/GAME_NAME/config.ds
 		*/
-		static Platform* create( const Table& config = Table::EMPTY_TABLE );
+		static Platform& create( const Table& config = Table::EMPTY );
 
 		///shuts down the platform and the game
 		static void shutdownPlatform();
 
-		static  Platform* getSingleton()
+		static Platform& singleton()
 		{
-			DEBUG_ASSERT( singleton, "The Platform singleton was not created, use Platform::create() to create it" );
+			DEBUG_ASSERT( singletonPtr, "The Platform singleton was not created, use Platform::create() to create it" );
 
-			return singleton;
-		}	
+			return *singletonPtr;
+		}
 		
 		virtual ~Platform();
 		
-		Game* getGame()
+		Game& getGame()
 		{
-			return game;
+			return *game;
 		}
 
 		///add a format that will be recognized as a zip package by the file loader
@@ -55,15 +55,15 @@ namespace Dojo
 		}
 
 		///returns the SoundManager instance
-		SoundManager* getSoundManager()	{	return sound;	}
+		SoundManager& getSoundManager()	{	return *sound;	}
 		///returns the Render instance
-		Render* getRender()				{	return render;	}
+		Renderer& getRenderer()				{	return *render;	}
 		///returns the InputSystem instance
-		InputSystem* getInput()			{	return input;	}
+		InputSystem& getInput()			{	return *input;	}
 		///returns the FontSystem instance
-		FontSystem* getFontSystem()		{	return fonts;	}
+		FontSystem& getFontSystem()		{	return *fonts;	}
 		///returns the system Log
-		Log* getLog()						{	return mLog;	}
+		Log& getLog()						{	return *mLog;	}
 
 		///returns the default BackgroundQueue
 		BackgroundQueue* getBackgroundQueue()	{	return mBackgroundQueue;	}
@@ -183,13 +183,13 @@ namespace Dojo
 		\param out vector where the results are appended*/
 		void getFilePathsForType( const String& type, const String& path, std::vector<String>& out );
 
-		///loads the table found at absPath into dest
+		///loads the table found at absPath
 		/**if absPath is empty, the table file is loaded from $(Appdata)/$(GameName)/$(TableName).ds */
-		void load( Table* dest, const String& absPath = String::EMPTY );
+		Table load( const String& absPathOrName );
 		
 		///saves the table found at absPath into dest
 		/**if absPath is empty, the table file is saved to $(Appdata)/$(GameName)/$(TableName).ds */
-		void save( Table* table, const String& absPath = String::EMPTY );
+		void save( const Table& table, const String& absPathOrName );
 		
 		///returns true if an application is blocking the system output for this app, eg. a call or the mp3 player on iOS
 		virtual bool isSystemSoundInUse()
@@ -220,7 +220,7 @@ namespace Dojo
 		typedef std::unordered_map< String, PathList > ZipFoldersMap;
 		typedef std::unordered_map< String, ZipFoldersMap > ZipFileMapping;
 
-		static Platform* singleton;
+		static Unique<Platform> singletonPtr;
 		
 		int screenWidth, screenHeight, windowWidth, windowHeight;
 		Orientation screenOrientation;
@@ -234,7 +234,7 @@ namespace Dojo
 		Game* game;
 
 		SoundManager* sound;
-		Render* render;
+		Renderer* render;
 		InputSystem* input;
 		FontSystem* fonts;
 		
@@ -243,13 +243,13 @@ namespace Dojo
 		Log* mLog;
 		BackgroundQueue* mBackgroundQueue;
 
-		Dojo::Array< ApplicationListener* > focusListeners;
+		Array< ApplicationListener* > focusListeners;
 
 		///this "caches" the zip headers for faster access - each zip that has been opened has its paths cached here!
 		ZipFileMapping mZipFileMaps;
 		ZipExtensionList mZipExtensions;
 
-		String _getTablePath( Table* dest, const String& absPath );
+		String _getTablePath( const String& absPathOrName );
 
 		///for each component in the path, check if a directory.zip file exists
 		String _replaceFoldersWithExistingZips( const String& absPath );

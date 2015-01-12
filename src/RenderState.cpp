@@ -10,7 +10,7 @@
 
 using namespace Dojo;
 
-Dojo::RenderState::TextureUnit::TextureUnit() :
+RenderState::TextureUnit::TextureUnit() :
 scale(1, 1),
 rotation(0),
 offset(0, 0),
@@ -19,7 +19,7 @@ optTransform(nullptr) {
 
 }
 
-Dojo::RenderState::TextureUnit::~TextureUnit() {
+RenderState::TextureUnit::~TextureUnit() {
 	if (optTransform)
 		SAFE_DELETE(optTransform);
 }
@@ -35,14 +35,14 @@ void RenderState::TextureUnit::_updateTransform() {
 	*optTransform = glm::rotate(*optTransform, Math::toEuler(rotation), Vector::UNIT_Z);
 }
 
-void Dojo::RenderState::TextureUnit::applyTransform() {
+void RenderState::TextureUnit::applyTransform() {
 	DEBUG_ASSERT(optTransform, "Tried to apply a non-existing texture transform");
 
 	glMatrixMode(GL_TEXTURE);
 	glLoadMatrixf(glm::value_ptr(*optTransform));
 }
 
-const Matrix& RenderState::TextureUnit::getTransform() {
+const Matrix& RenderState::TextureUnit::getTransform() const {
 	static const Matrix identityMatrix;
 	return isTransformRequired() ? *optTransform : identityMatrix;
 }
@@ -53,7 +53,7 @@ cullMode(CM_BACK),
 blendingEnabled(true),
 srcBlend(GL_SRC_ALPHA),
 destBlend(GL_ONE_MINUS_SRC_ALPHA),
-blendEquation(GL_FUNC_ADD),
+blendFunction(GL_FUNC_ADD),
 mesh(nullptr),
 pShader(nullptr) {
 	memset(textures, 0, sizeof(textures)); //zero all the textures
@@ -80,21 +80,29 @@ void RenderState::setTexture(Texture* tex, int ID /*= 0 */) {
 }
 
 void RenderState::setBlending(BlendingMode mode) {
-	static const GLenum modeToGLTable[] = {
-		GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, //alphablend
-		GL_DST_COLOR, GL_ZERO, //multiply
-		GL_ONE, GL_ONE, //add
-		GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_COLOR //invert
+	struct GLBlend {
+		GLenum src, dest, func;
 	};
 
-	setBlending(modeToGLTable[mode * 2], modeToGLTable[mode * 2 + 1]);
+	static const GLBlend modeToGLTable[] = {
+		{ GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_FUNC_ADD }, //alphablend
+		{ GL_DST_COLOR, GL_ZERO, GL_FUNC_ADD },  //multiply
+		{ GL_ONE, GL_ONE, GL_FUNC_ADD },  //add
+		{ GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_COLOR, GL_FUNC_ADD },  //invert
+		{ GL_ONE, GL_ONE, GL_FUNC_SUBTRACT } //subtract
+	};
+
+	auto& blend = modeToGLTable[(int)mode];
+
+	setBlending(blend.src, blend.dest);
+	blendFunction = blend.func;
 }
 
 void RenderState::setShader(Shader* shader) {
 	pShader = shader;
 }
 
-Texture* RenderState::getTexture(int ID /*= 0 */) {
+Texture* RenderState::getTexture(int ID /*= 0 */) const {
 	DEBUG_ASSERT(ID >= 0, "Can't retrieve a negative texture ID");
 	DEBUG_ASSERT(ID < DOJO_MAX_TEXTURES, "An ID passed to getTexture must be smaller than DOJO_MAX_TEXTURE_UNITS");
 
@@ -104,11 +112,11 @@ Texture* RenderState::getTexture(int ID /*= 0 */) {
 		return NULL;
 }
 
-RenderState::TextureUnit* RenderState::getTextureUnit(int ID) {
+const RenderState::TextureUnit& RenderState::getTextureUnit(int ID) const {
 	DEBUG_ASSERT(ID >= 0, "Can't retrieve a negative textureUnit");
 	DEBUG_ASSERT(ID < DOJO_MAX_TEXTURES, "An ID passed to getTextureUnit must be smaller than DOJO_MAX_TEXTURE_UNITS");
 
-	return textures[ID];
+	return *textures[ID];
 }
 
 int RenderState::getDistance(RenderState* s) {
@@ -130,19 +138,6 @@ int RenderState::getDistance(RenderState* s) {
 
 	return dist;
 }
-
-void RenderState::useAlphaBlend() {
-	srcBlend = GL_SRC_ALPHA;
-	destBlend = GL_ONE_MINUS_SRC_ALPHA;
-	blendEquation = GL_FUNC_ADD;
-}
-
-void RenderState::useAdditiveBlend() {
-	destBlend = GL_ONE;
-	srcBlend = GL_SRC_ALPHA;
-	blendEquation = GL_FUNC_ADD;
-}
-
 
 bool RenderState::isAlphaRequired()
 {
@@ -183,7 +178,7 @@ void RenderState::applyState()
 	else                    glDisable( GL_BLEND );
 	
 	glBlendFunc( srcBlend, destBlend );
-	glBlendEquation( blendEquation );
+	glBlendEquation( blendFunction );
 	
 	switch( cullMode )
 	{
@@ -205,93 +200,12 @@ void RenderState::applyState()
 	mesh->bind( pShader );
 }
 
-void RenderState::commitChanges( RenderState* pastState )
-{
-	DEBUG_ASSERT( pastState, "the past RenderState is null" );
+void RenderState::commitChanges() {
 	DEBUG_ASSERT( mesh, "A mesh is required to setup a new renderstate" );
 
 	//always bind color as it is just not expensive
 	glColor4f( color.r, color.g, color.b, color.a );
-		
-#ifdef DOJO_FORCE_WHOLE_RENDERSTATE_COMMIT
 	
+	//TODO incremental state switches please!
 	applyState();
-	
-#else
-		
-	//bind the new textures
-	for( int i = 0; i < DOJO_MAX_TEXTURE_UNITS; ++i )
-	{
-		//different from previous?
-		if( (pastState->textures[i] == NULL && textures[i] != NULL) ||
-			(pastState->textures[i] != NULL && textures[i] == NULL) ||
-			((pastState->textures[i] && textures[i]) && pastState->textures[i]->texture != textures[i]->texture ) )
-		{
-			//select current slot
-			glActiveTexture( GL_TEXTURE0 + i );
-
-			if( textures[i] )
-			{
-				textures[i]->texture->bind(i);
-
-				if( textures[i]->isTransformRequired() )
-				{
-					textures[i]->applyTransform();
-				}
-				else if( pastState->textures[i] && pastState->textures[i]->isTransformRequired() ) //override with null trans
-				{
-					glMatrixMode( GL_TEXTURE );
-					glLoadIdentity();
-				}
-			}
-			else
-			{
-				//override the previous bound texture with nothing
-				glBindTexture( GL_TEXTURE_2D, NULL );
-				glDisable( GL_TEXTURE_2D );
-			}
-		}
-	}
-
-	//bind the new mesh
-	if( mesh != pastState->mesh )
-		mesh->bind();
-
-	//enable or disable blending
-	if( blendingEnabled != pastState->blendingEnabled )
-	{
-		if( blendingEnabled )
-			glEnable( GL_BLEND );
-		else
-			glDisable( GL_BLEND ); 
-	}
-	
-	//change blending mode
-	if( srcBlend != pastState->srcBlend || destBlend != pastState->destBlend )
-		glBlendFunc( srcBlend, destBlend );
-
-	//change blending equation
-	if( blendEquation != pastState->blendEquation )
-		glBlendEquation( blendEquation );
-
-	if( cullMode != pastState->cullMode )
-	{
-		switch( cullMode )
-		{
-		case CM_DISABLED:
-			glDisable( GL_CULL_FACE );
-			break;
-
-		case CM_BACK:
-			glEnable( GL_CULL_FACE );
-			glCullFace( GL_BACK );
-			break;
-
-		case CM_FRONT:
-			glEnable( GL_CULL_FACE );
-			glCullFace( GL_FRONT );
-		}
-	}
-#endif
-	
 }

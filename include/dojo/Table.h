@@ -12,6 +12,8 @@
 
 namespace Dojo
 {
+	class Entry;
+
 	///Table is the internal representation of the Dojo Script data definition format
 	/** 
 	a Table is a multi-typed Dictionary of Strings and Values, where a value can be one of float, Vector, String, Color, Raw Data and Table itself.
@@ -40,6 +42,8 @@ namespace Dojo
 		class Data
 		{
 		public:
+			static const Data EMPTY;
+
 			void* ptr;
 			int size;
 			
@@ -62,59 +66,59 @@ namespace Dojo
 				
 			}			
 		};
-		
+
 		class Entry
 		{
 		public:
-			FieldType type;
-			
-			Entry( FieldType fieldType ) :
-			type( fieldType )
+			Table::FieldType type;
+
+			Entry(Table::FieldType fieldType) :
+				type(fieldType)
 			{
 
 			}
-					
+
 			virtual ~Entry()
 			{
-				
-			}
-								
-			///returns a raw unyped pointer to the underlying data
-			virtual void* getRawValue() =0;
 
-			float getAsNumber() 
+			}
+
+			///returns a raw unyped pointer to the underlying data
+			virtual void* getRawValue() = 0;
+
+			float getAsNumber()
 			{
-				DEBUG_ASSERT( type == FT_NUMBER, "type mismatch while reading from a Table Entry" );
+				DEBUG_ASSERT(type == Table::FT_NUMBER, "type mismatch while reading from a Table Entry");
 				return *(float*)getRawValue();
 			}
 
 			const String& getAsString()
 			{
-				DEBUG_ASSERT( type == FT_STRING, "type mismatch while reading from a Table Entry" );
+				DEBUG_ASSERT(type == Table::FT_STRING, "type mismatch while reading from a Table Entry");
 				return *(String*)getRawValue();
 			}
 
 			const Vector& getAsVector()
 			{
-				DEBUG_ASSERT( type == FT_VECTOR, "type mismatch while reading from a Table Entry" );
+				DEBUG_ASSERT(type == Table::FT_VECTOR, "type mismatch while reading from a Table Entry");
 				return *(Vector*)getRawValue();
 			}
 
-			Table* getAsTable()
+			Table& getAsTable()
 			{
-				DEBUG_ASSERT( type == FT_TABLE, "type mismatch while reading from a Table Entry" );
-				return (Table*)getRawValue();
+				DEBUG_ASSERT(type == Table::FT_TABLE, "type mismatch while reading from a Table Entry");
+				return *(Table*)getRawValue();
 			}
 
-			const Data& getAsData()
+			const Table::Data& getAsData()
 			{
-				DEBUG_ASSERT( type == FT_DATA, "type mismatch while reading from a Table Entry" );
-				return *(Data*)getRawValue();
+				DEBUG_ASSERT(type == Table::FT_DATA, "type mismatch while reading from a Table Entry");
+				return *(Table::Data*)getRawValue();
 			}
 
-			virtual Entry* clone()=0;
+			virtual Unique<Entry> clone() = 0;
 		};
-		
+
 		template <class T>
 		class TypedEntry : public Entry
 		{
@@ -122,137 +126,72 @@ namespace Dojo
 
 			T value;
 
-			TypedEntry( FieldType fieldType, const T& v ) :
-			Entry( fieldType ), 
-			value( v )
+			TypedEntry(FieldType fieldType, const T& v) :
+				Entry(fieldType),
+				value(v)
 			{
-				
+
 			}
-			
+
 			virtual ~TypedEntry()
 			{
-				
+
 			}
-			
+
 			///returns the raw value pointer
 			virtual void* getRawValue()
 			{
 				return &value;
 			}
-			
-			virtual Entry* clone()
+
+			virtual Unique<Entry> clone()
 			{
-				return new TypedEntry<T>(type, value );
+				return make_unique< TypedEntry<T> >(type, value);
 			}
 		};
 
-		typedef std::unordered_map< String, Entry* > EntryMap;
+		typedef std::unordered_map< String, Unique<Entry> > EntryMap;
 
-		static Table EMPTY_TABLE;
-		static const Data EMPTY_DATA;
+		static const Table EMPTY;
 		
 		static String index( int i )
 		{
 			return '_' + String(i);
 		}
 
-		///loads the file at path into dest
-		static void loadFromFile( Table* dest, const String& path );
+		///loads the file at path
+		static Table loadFromFile( const String& path );
 		
-		///Creates a new table optionally named tablename
-		Table( const String& tablename = String::EMPTY ) :
-		Resource(),
-		name( tablename ),
-		unnamedMembers( 0 )
-		{
+		///Creates a new table
+		Table();
 
-		}
+		Table(Table&& t);
 
-		///copy constructor
-		Table( const Table& t ) :
-		Resource(),
-		name( t.name ),
-		unnamedMembers( t.unnamedMembers )
-		{
-			EntryMap::const_iterator itr = t.map.begin(),
-								end = t.map.end();
+		Table& operator=(Table&& t);
 
-			//do a deep copy
-			for( ; itr != end; ++itr )
-				map[ itr->first ] = itr->second->clone();
-		}
+		Table(const Table& t);
+
+		Table& operator=(const Table&) = delete;
 
 		///Constructs a new "Table Resource", or a table bound to a file path in a ResourceGroup
-		Table( ResourceGroup* creator, const String& path ) :
-		Resource( creator, path ),
-		name( Utils::getFileName( path ) ),
-		unnamedMembers( 0 )
-		{
+		Table( ResourceGroup* creator, const String& path );
 
-		}
-
-		~Table()
-		{
-			clear();
-		}
+		~Table();
 
 		virtual bool onLoad();
 
-		virtual void onUnload( bool soft = false )
-		{
-			if( !soft || isReloadable() )
-			{
-				clear();
-
-				loaded = false;
-			}
-		}
-		
-		///sets the Table name
-		void setName( const String& newName )
-		{
-			DEBUG_ASSERT( newName.size() > 0, "Setting an empty Table name" );
-
-			name = newName;
-		}
+		virtual void onUnload( bool soft = false );
 
 		///returns the table which contains the given "dot formatted" key
 		/** it returns "this" for a normal non-hierarchical key
 		returns "A" for a key such as "A.key"
 		returns "B" for a key such as "A.B.key" */
-		Table* getParentTable( const String& key, String& realKey ) const
-		{
-			size_t dotIdx = 0;
-			for(; dotIdx< key.size() && key[dotIdx] != '.'; ++dotIdx ); 
-
-			if( dotIdx == key.size() )
-			{
-				realKey = key;
-				return (Table*)this;
-			}
-
-			String partialKey = key.substr( dotIdx+1 );
-			String childName = key.substr( 0, dotIdx );
-			Table* child = getTable( childName );
-
-			DEBUG_ASSERT_INFO( child->size() > 0, "A part of a dot-formatted key referred to a non-existing table", "childName = " + childName );
-
-			return child->getParentTable( partialKey, realKey );
-		}
+		Table* getParentTable( const String& key, String& realKey ) const;
 
 		template< class T >
 		void setImpl( const String& key, FieldType type, const T& value )
 		{
-			//generate name
-			if( key.size() == 0 )
-				map[ autoname() ] = new TypedEntry< T >( type, value );
-			else
-			{
-				if( exists( key ) )
-					SAFE_DELETE( map[key] );
-
-				map[ key ] = new TypedEntry< T >( type, value );
-			}
+			map[ key.empty() ? autoname() : key ] = make_unique< TypedEntry< T > >( type, value );
 		}
 
 		template< class T >
@@ -306,39 +245,18 @@ namespace Dojo
 			set(key, FT_DATA, Data( value, size ) );
 		}
 		
-		void set( const Table& value )
+		void set( const String& key, const Table& value )
 		{						
-			set( value.getName(), FT_TABLE, value );
+			set( key, FT_TABLE, value );
 		}		
 		
 		///creates a new nested table named key
 		/** 
 		nested Tables always have name == key */
-		Table* createTable( const String& key = String::EMPTY )
-		{	
-			String name;
-			
-			if( key.size() == 0 )
-				name = autoname();
-			else
-				name = key;
-							
-			set( Table( name ) ); //always retain created tables
-			
-			return getTable( name ); //TODO don't do another search
-		}
-		
+		Table& createTable( const String& key = String::EMPTY );
+
 		///empties the map and deletes every value
-		void clear()
-		{					
-			unnamedMembers = 0;
-			
-			//clean up every entry
-			for( auto entry : map )
-				SAFE_DELETE( entry.second );
-			
-			map.clear();
-		}		
+		void clear();		
 		
 		///Inherits all the member in table t
 		/** 
@@ -346,171 +264,57 @@ namespace Dojo
 		Nested Tables are an exception as if they're defined in both, the local nested table will
 		recursively inherit the other nested table.
 		*/
-		void inherit( Table* t )
-		{
-			DEBUG_ASSERT( t != nullptr, "Cannot inherit a null Table" );
-
-			//for each map member of the other map
-			EntryMap::iterator itr = t->map.begin(),
-								end = t->map.end(),
-								existing;
-			for( ; itr != end; ++itr )
-			{
-				existing = map.find( itr->first ); //look for a local element with the same name
-
-				//element exists - do nothing except if it's a table
-				if( existing != map.end() )
-				{
-					//if it's a table in both tables, inherit
-					if( itr->second->type == FT_TABLE && existing->second->type == FT_TABLE )
-						((Table*)existing->second->getRawValue())->inherit( (Table*)itr->second->getRawValue() );
-				}
-				else //just clone
-					map[ itr->first ] = itr->second->clone();
-			}
-		}
+		void inherit( Table* t );
 
 		///total number of entries
-		int size()
+		int size() const
 		{
 			return (int)map.size();
 		}
 		
-		const String& getName() const
-		{
-			return name;
-		}
-
 		///returns the total number of unnamed members
-		int getAutoMembers() const
+		int getArrayLength() const
 		{
 			return unnamedMembers;
 		}
 
-		bool isEmpty()
+		bool isEmpty() const
 		{
 			return map.empty();
 		}
-
-		bool hasName() const
-		{
-			return name.size() > 0;
+		
+		operator bool() const {
+			return !map.empty();
 		}
 
 		///returns true if this Table contains key
-		bool exists( const String& key ) const
-		{
-			DEBUG_ASSERT( key.size(), "exists: key is empty" );
-
-			return map.find( key ) != map.end();
-		}
+		bool exists( const String& key ) const;
 
 		///returns true if this Table contains key and the value is of type t
-		bool existsAs( const String& key, FieldType t ) const
-		{
-			EntryMap::const_iterator itr = map.find( key );
-						
-			if( itr != map.end() )
-			{
-				Entry* e = itr->second;
-				return e->type == t;
-			}
-			return false;
-		}
+		bool existsAs( const String& key, FieldType t ) const;
 		
 		///generic get
-		Entry* get( const String& key ) const
-		{
-			String actualKey;
-			const Table* container = getParentTable( key, actualKey );
-			
-			if( !container )
-				return NULL;
-
-			auto elem = container->map.find( actualKey );
-			return elem != container->map.end() ? elem->second : NULL;
-		}
+		Entry* get( const String& key ) const;
 		
-		float getNumber( const String& key, float defaultValue = 0 ) const
-		{			
-			Entry* e = get( key );
-			if( e && e->type == FT_NUMBER )
-				return e->getAsNumber();
-			else
-				return defaultValue;
-		}
+		float getNumber( const String& key, float defaultValue = 0 ) const;
 		
-		int getInt( const String& key, int defaultValue = 0 ) const
-		{
-			return (int)getNumber(key , (float)defaultValue);
-		}
+		int getInt( const String& key, int defaultValue = 0 ) const;
 		
-		bool getBool( const String& key, bool defaultValue = false ) const
-		{
-			Entry* e = get( key );
-			if( e && e->type == FT_NUMBER )
-				return e->getAsNumber() > 0;
-			else
-				return defaultValue;
-		}
+		bool getBool( const String& key, bool defaultValue = false ) const;
 		
-		const String& getString( const String& key, const String& defaultValue = String::EMPTY ) const
-		{
-			Entry* e = get( key );
-			if( e && e->type == FT_STRING )
-				return e->getAsString();
-			else
-				return defaultValue;
-		}
+		const String& getString( const String& key, const String& defaultValue = String::EMPTY ) const;
 		
-		const Vector& getVector( const String& key, const Vector& defaultValue = Vector::ZERO ) const
-		{
-			Entry* e = get( key );
-			if( e && e->type == FT_VECTOR )
-				return e->getAsVector();
-			else
-				return defaultValue;
-		}
+		const Vector& getVector( const String& key, const Vector& defaultValue = Vector::ZERO ) const;
 		
-		const Color getColor( const String& key, float alpha = 1.f, const Color& defaultValue = Color::BLACK ) const
-		{
-			Entry* e = get( key );
-			if( e && e->type == FT_VECTOR )
-				return Color( e->getAsVector(), alpha );
-			else
-				return defaultValue;
-		}
+		const Color getColor( const String& key, const Color& defaultValue = Color::BLACK ) const;
 		
-		Table* getTable( const String& key ) const
-		{			
-			Entry* e = get( key );
-			if( e && e->type == FT_TABLE )
-				return e->getAsTable();
-			else
-				return &EMPTY_TABLE;
-		}
+		const Table& getTable( const String& key ) const;
 		
-		const Data& getData( const String& key ) const
-		{
-			Entry* e = get( key );
-			if( e && e->type == FT_DATA )
-				return e->getAsData();
-			else
-				return EMPTY_DATA;
-		}	
+		const Data& getData( const String& key ) const;	
 		
-		String autoMemberName( int idx ) const 
-		{
-			DEBUG_ASSERT( idx >= 0, "autoMemberName: idx is negative" );
-			DEBUG_ASSERT_INFO( idx < getAutoMembers(), "autoMemberName: idx is OOB", String("idx = ") + idx );
-			
-			return '_' + String( idx );
-		}
+		String autoMemberName( int idx ) const;
 		
-		float getNumber( int idx ) const
-		{			
-			return getNumber( autoMemberName( idx ) );
-		}
+		float getNumber( int idx ) const;
 		
 		int getInt( int idx ) const
 		{
@@ -537,7 +341,7 @@ namespace Dojo
 			return Color( getVector( idx ), alpha );
 		}
 		
-		Table* getTable( int idx ) const
+		const Table& getTable( int idx ) const
 		{			
 			return getTable( autoMemberName(idx) );
 		}
@@ -548,9 +352,11 @@ namespace Dojo
 		}	
 
 		///returns a new unique anoymous id for a new "array member"
-		String autoname()
-		{
-			return '_' + String( unnamedMembers++ );
+		String autoname();
+
+		template<typename T>
+		void push(const T& t) {
+			set(autoname(), t);
 		}
 		
 		const EntryMap::const_iterator begin() const
@@ -564,42 +370,20 @@ namespace Dojo
 		}
 		
 		///removes a member named key
-		void remove( const String& key )
-		{
-			map.erase( key );
-		}
+		void remove( const String& key );
 		
 		///removes the unnamed member index idx
-		void remove( int idx )
-		{
-			map.erase( autoMemberName( idx ) );
-		}
+		void remove( int idx );
 
-		bool isEmpty() const
-		{
-			return map.empty();
-		}
-		
 		///write the table in string form over buf
 		void serialize( String& buf, String indent = String::EMPTY ) const;
 
 		void deserialize( StringReader& buf );
 		
 		///diagnostic method that serializes the table in a string
-		String toString() const
-		{
-			String str = getName() + '\n';
-			serialize( str );
-			
-			return str;
-		}
+		String toString() const;
 		
-		void debugPrint() const
-		{
-#ifdef _DEBUG			
-			DEBUG_MESSAGE( toString() );
-#endif
-		}
+		void debugPrint() const;
 
 		///returns an iterator to the beginning of the internal dictionary
 		EntryMap::iterator begin()
@@ -614,8 +398,6 @@ namespace Dojo
 		}
 				
 	protected:
-		
-		String name;
 		
 		EntryMap map;
 

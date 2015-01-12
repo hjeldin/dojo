@@ -12,8 +12,7 @@
 #include "Array.h"
 #include "Color.h"
 #include "Vector.h"
-
-#define RENDER_MAX_LIGHTS 8
+#include "RenderLayer.h"
 
 namespace Dojo {
 	
@@ -22,36 +21,11 @@ namespace Dojo {
 	class Texture;
 	class Viewport;
 	class Mesh;
-	class Platform;
 	class Game;
-	class Light;
 	
-	class Render 
+	class Renderer 
 	{	
 	public:		
-
-		class Layer : public Dojo::Array< Renderable* >
-		{
-		public:
-			bool visible,
-				depthCheck,
-				lightingOn,
-				projectionOff,
-				depthClear,
-				wireframe;
-
-			Layer() :
-			visible( true ),
-			depthCheck( false ),
-			lightingOn( false ),
-			projectionOff( true ),
-			depthClear( true ),
-			wireframe( false )
-			{
-
-			}
-		};
-
 		///a struct that exposes current rendering parameters such as transforms
 		struct CurrentState
 		{
@@ -60,32 +34,27 @@ namespace Dojo {
 
 		} currentState;
 						
-		typedef Array< Layer* > LayerList;
-		typedef Array< Light* > LightList;
-		typedef Array< Viewport* > ViewportList;
+		typedef std::vector< RenderLayer > LayerList;
+		typedef std::vector< Viewport* > ViewportList;
 		
-		Render( int width, int height, Orientation renderOrientation );		
+		Renderer( int width, int height, Orientation renderOrientation );		
 		
-		~Render();		
+		~Renderer();		
 						
-		void addRenderable( Renderable* s, int layer );
+		void addRenderable( Renderable& s, RenderLayer::ID layerID );
 				
-		void removeRenderable( Renderable* s );
+		void removeRenderable( Renderable& s );
 		
 		void removeAllRenderables();
 
-		void removeViewport( Viewport* v );
+		void removeViewport( const Viewport& v );
 
 		void removeAllViewports();
-		
-		void addLight( Light* l );
-		
-		void removeLight( Light* l );
 		
 		///completely removes all layers!
 		void clearLayers();
 		
-		void addViewport( Viewport* v );
+		void addViewport( Viewport& v );
 						
 		void setInterfaceOrientation( Orientation o );
 
@@ -96,21 +65,21 @@ namespace Dojo {
 			return renderOrientation;
 		}
 		
-		Layer* getLayer( int layerID );
+		RenderLayer& getLayer( RenderLayer::ID layerID );
 		
-		bool hasLayer( int layerID );
+		bool hasLayer( RenderLayer::ID layerID );
 
 		int getLayerNumber()
 		{
 			return positiveLayers.size() + negativeLayers.size();
 		}
 		
-		int getFirstLayerID()
+		RenderLayer::ID getBottomLayerID() const
 		{
-			return -negativeLayers.size();	
+			return -(RenderLayer::ID)negativeLayers.size();	
 		}
 		
-		int getLastLayerID()
+		RenderLayer::ID getFrontLayerID() const
 		{
 			return positiveLayers.size();
 		}
@@ -124,20 +93,18 @@ namespace Dojo {
 		bool isValid()						{	return valid;		}
 		
 		///renders a single element using the given viewport
-		void renderElement( Viewport* v, Renderable* r );
+		void renderElement( Viewport& viewport, Renderable& elem );
 		
 		///renders a whole layer on the given viewport
-		void renderLayer( Viewport* v, Layer* list );
+		void renderLayer( Viewport& viewport, const RenderLayer& layer );
 
 		///renders a viewport and all its visible layers
-		void renderViewport( Viewport* v );
+		void renderViewport( Viewport& viewport );
 		
 		//renders all the layers and their contained Renderables in the given order
 		void render();
 				
-	protected:	
-
-		Platform* platform;
+	protected:
 		
 		bool valid;
 						
@@ -147,19 +114,16 @@ namespace Dojo {
 		float renderRotation;
 		Orientation renderOrientation, deviceOrientation;
 
-		ViewportList mViewportList;
+		ViewportList viewportList;
 		
-		RenderState* currentRenderState, *firstRenderState;
-		Layer* currentLayer;
+		const RenderLayer* currentLayer;
 
 		int frameVertexCount, frameTriCount, frameBatchCount;
 				
 		bool frameStarted;
 		
 		LayerList negativeLayers, positiveLayers;
-		Layer* backLayer;
-		
-		LightList lights;
+	
 		Color defaultAmbient;
 		
 		Matrix mRenderRotation;

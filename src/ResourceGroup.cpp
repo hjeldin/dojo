@@ -59,16 +59,15 @@ void ResourceGroup::addLocalizedFolder( const String& basefolder, int version )
 		addFolderSimple( lid + fallbackLocale, version );
 }
 
-void ResourceGroup::addTable( Table* t )
+void ResourceGroup::addTable( const String& name, Unique<Table> t )
 {
-	DEBUG_ASSERT( t != nullptr, "addTable: Table is null" );
-	DEBUG_ASSERT( !getTable( t->getName() ), "addTable: a table with this name was already added" );
+	DEBUG_ASSERT( !name.empty(), "addTable: a table with this name was already added" );
 	DEBUG_ASSERT( !finalized, "This ResourceGroup can't be modified" );
 	
-	tables[ t->getName() ] = t;
+	tables[ name ] = t.release();
 	
 	if (logchanges)
-		DEBUG_MESSAGE( "+" + t->getName() + "\t\t table" );
+		DEBUG_MESSAGE( "+" + name.ASCII() + "\t\t table" );
 }
 
 void ResourceGroup::addSets( const String& subdirectory, int version )
@@ -82,8 +81,8 @@ void ResourceGroup::addSets( const String& subdirectory, int version )
 	FrameSet* currentSet = NULL;
 	
 	//find pngs and jpgs
-	Platform::getSingleton()->getFilePathsForType( "png", subdirectory, paths );
-	Platform::getSingleton()->getFilePathsForType( "jpg", subdirectory, paths );	
+	Platform::singleton().getFilePathsForType( "png", subdirectory, paths );
+	Platform::singleton().getFilePathsForType( "jpg", subdirectory, paths );	
 	
 	for( int i = 0; i < paths.size(); ++i )
 	{
@@ -103,14 +102,13 @@ void ResourceGroup::addSets( const String& subdirectory, int version )
 		}
 		
 		//create a new buffer
-		Texture* t = new Texture( this, paths[i] );
-		currentSet->addTexture( t, true );
+		currentSet->addTexture(make_unique<Texture>(this, paths[i]));
 		
 		lastName = name;
 	}
 
 	paths.clear();
-	Platform::getSingleton()->getFilePathsForType( "atlasinfo", subdirectory, paths );
+	Platform::singleton().getFilePathsForType( "atlasinfo", subdirectory, paths );
 	
 	//now add atlases!		
 	Table def;
@@ -124,23 +122,23 @@ void ResourceGroup::addSets( const String& subdirectory, int version )
 
 		name = Utils::removeVersion( name );
 
-		Platform::getSingleton()->load( &def, paths[i] );
+		def = Platform::singleton().load( paths[i] );
 
 		//standard flat atlasinfo
-		if( def.getAutoMembers() == 0 )
+		if( def.getArrayLength() == 0 )
 		{			
 			currentSet = new FrameSet( this, name );
-			currentSet->setAtlas( &def, this );
+			currentSet->setAtlas( def, *this );
 		
 			addFrameSet( currentSet, name );
 		}
-		else for( int i = 0; i < def.getAutoMembers(); ++i )
+		else for( int i = 0; i < def.getArrayLength(); ++i )
 		{
-			Table* sub = def.getTable(i);
-			const String& name = sub->getString("name");
+			auto& sub = def.getTable(i);
+			const String& name = sub.getString("name");
 
 			currentSet = new FrameSet( this, name );
-			currentSet->setAtlas( sub, this );
+			currentSet->setAtlas( sub, *this );
 
 			addFrameSet( currentSet, name );
 		}
@@ -158,7 +156,7 @@ void ResourceGroup::addFonts( const String& subdirectory, int version )
 	String name;
 	std::vector<String> paths;
 	
-	Platform::getSingleton()->getFilePathsForType( "font", subdirectory, paths );
+	Platform::singleton().getFilePathsForType( "font", subdirectory, paths );
 	
 	///just add a Font for any .ttf file found
 	for( int i = 0; i < paths.size(); ++i )
@@ -180,7 +178,7 @@ void ResourceGroup::addMeshes( const String& subdirectory )
 	std::vector<String> paths;
 	String name; 
 	
-	Platform::getSingleton()->getFilePathsForType( "mesh", subdirectory, paths );
+	Platform::singleton().getFilePathsForType( "mesh", subdirectory, paths );
 	
 	for( int i = 0; i < paths.size(); ++i )
 	{
@@ -198,7 +196,7 @@ void ResourceGroup::addSounds( const String& subdirectory )
 
 	SoundSet* currentSet = NULL;
 
-	Platform::getSingleton()->getFilePathsForType( "ogg", subdirectory, paths );
+	Platform::singleton().getFilePathsForType( "ogg", subdirectory, paths );
 	
 	for( int i = 0; i < paths.size(); ++i )
 	{
@@ -223,18 +221,21 @@ void ResourceGroup::addTables( const String& folder )
 {
 	std::vector< String > paths;
 	
-	Platform::getSingleton()->getFilePathsForType("ds", folder, paths );
+	Platform::singleton().getFilePathsForType("ds", folder, paths );
 	
-	for( int i = 0; i < paths.size(); ++i )
-		addTable( new Table( this, paths[i] ) );
+	for (int i = 0; i < paths.size(); ++i)
+		addTable(
+			Utils::getFileName(paths[i]), 
+			make_unique<Table>(this, paths[i])
+		);
 }
 
 void ResourceGroup::addPrograms( const String& folder )
 {
 	std::vector< String > paths;
 
-	Platform::getSingleton()->getFilePathsForType("vs", folder, paths );
-	Platform::getSingleton()->getFilePathsForType("ps", folder, paths );
+	Platform::singleton().getFilePathsForType("vs", folder, paths );
+	Platform::singleton().getFilePathsForType("ps", folder, paths );
 
 	for( auto& path : paths )
 	{
@@ -247,7 +248,7 @@ void ResourceGroup::addShaders( const String& folder )
 {
 	std::vector< String > paths;
 
-	Platform::getSingleton()->getFilePathsForType("shader", folder, paths );
+	Platform::singleton().getFilePathsForType("shader", folder, paths );
 
 	for( auto& path : paths )
 	{

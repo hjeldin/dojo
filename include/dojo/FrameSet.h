@@ -61,19 +61,24 @@ namespace Dojo
 		/**
 		the required texture must have been already loaded inside atlasTextureProvider
 		*/
-		void setAtlas( Table* atlasTable, ResourceGroup* atlasTextureProvider );
+		void setAtlas( const Table& atlasTable, ResourceGroup& atlasTextureProvider );
 
 		virtual bool onLoad();
 		
 		///unload all of the content;
 		virtual void onUnload(bool soft);
 				
-		///adds a texture to this frame set
+		///adds a non-owned texture to this frame set
 		/*
 		\param t the texture
-		\param owner specifies  if this FrameSet is the only owner for garbage collection purposes
 		*/
-		void addTexture( Texture* t, bool owner = false );
+		void addTexture( Texture& t );
+
+		///adds a owned texture to this frame set
+		/*
+		\param t the texture
+		*/
+		void addTexture(Unique<Texture> t);
 		
 		///returns the (looped!) frame at index i
 		/** 

@@ -19,6 +19,7 @@
     <ClInclude Include="include\dojo\Array.h" />
     <ClInclude Include="include\dojo\AStar.h" />
     <ClInclude Include="include\dojo\BackgroundQueue.h" />
+    <ClInclude Include="include\dojo\BlendingMode.h" />
     <ClInclude Include="include\dojo\Console.h" />
     <ClInclude Include="include\dojo\DebugUtils.h" />
     <ClInclude Include="include\dojo\dojostring.h" />
@@ -37,6 +38,7 @@
     <ClInclude Include="include\dojo\MemoryInputStream.h" />
     <ClInclude Include="include\dojo\Pipe.h" />
     <ClInclude Include="include\dojo\PolyTextArea.h" />
+    <ClInclude Include="include\dojo\RenderLayer.h" />
     <ClInclude Include="include\dojo\Resource.h" />
     <ClInclude Include="include\dojo\Color.h" />
     <ClInclude Include="include\dojo\dojomath.h" />
@@ -49,22 +51,21 @@
     <ClInclude Include="include\dojo\Game.h" />
     <ClInclude Include="include\dojo\GameState.h" />
     <ClInclude Include="include\dojo\InputSystem.h" />
-    <ClInclude Include="include\dojo\Light.h" />
     <ClInclude Include="include\dojo\Mesh.h" />
     <ClInclude Include="include\dojo\Noise.h" />
     <ClInclude Include="include\dojo\Object.h" />
     <ClInclude Include="include\dojo\Particle.h" />
-    <ClInclude Include="include\dojo\ParticlePool.h" />
     <ClInclude Include="include\dojo\Plane.h" />
     <ClInclude Include="include\dojo\Platform.h" />
     <ClInclude Include="include\dojo\Random.h" />
-    <ClInclude Include="include\dojo\Render.h" />
+    <ClInclude Include="include\dojo\Renderer.h" />
     <ClInclude Include="include\dojo\Renderable.h" />
     <ClInclude Include="include\dojo\RenderState.h" />
     <ClInclude Include="include\dojo\ResourceGroup.h" />
     <ClInclude Include="include\dojo\Shader.h" />
     <ClInclude Include="include\dojo\ShaderProgram.h" />
     <ClInclude Include="include\dojo\ShaderProgramType.h" />
+    <ClInclude Include="include\dojo\SmallSet.h" />
     <ClInclude Include="include\dojo\SoundBuffer.h" />
     <ClInclude Include="include\dojo\SoundManager.h" />
     <ClInclude Include="include\dojo\SoundSet.h" />
@@ -98,6 +99,7 @@
     <ClCompile Include="include\dojo\Keyboard.cpp" />
     <ClCompile Include="include\dojo\LogListener.cpp" />
     <ClCompile Include="include\dojo\MemoryInputStream.cpp" />
+    <ClCompile Include="include\dojo\StringReader.cpp" />
     <ClCompile Include="include\dojo\win32\XInputController.cpp" />
     <ClCompile Include="src\AnimatedQuad.cpp" />
     <ClCompile Include="src\AStar.cpp" />
@@ -111,16 +113,14 @@
     <ClCompile Include="src\GameState.cpp" />
     <ClCompile Include="src\InputDevice.cpp" />
     <ClCompile Include="src\InputSystem.cpp" />
-    <ClCompile Include="src\Light.cpp" />
     <ClCompile Include="src\Log.cpp" />
     <ClCompile Include="src\Math.cpp" />
     <ClCompile Include="src\Mesh.cpp" />
     <ClCompile Include="src\Noise.cpp" />
     <ClCompile Include="src\Object.cpp" />
-    <ClCompile Include="src\ParticlePool.cpp" />
     <ClCompile Include="src\Platform.cpp" />
     <ClCompile Include="src\PolyTextArea.cpp" />
-    <ClCompile Include="src\Render.cpp" />
+    <ClCompile Include="src\Renderer.cpp" />
     <ClCompile Include="src\Renderable.cpp" />
     <ClCompile Include="src\RenderState.cpp" />
     <ClCompile Include="src\ResourceGroup.cpp" />
@@ -192,22 +192,22 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
     <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
-    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">lib\</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">lib\$(Configuration)\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(Configuration)\</IntDir>
-    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">lib\</OutDir>
-    <OutDir Condition="'$(Configuration)|$(Platform)'=='Publish|Win32'">lib\</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">lib\$(Configuration)\</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Publish|Win32'">lib\$(Configuration)\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(Configuration)\</IntDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Publish|Win32'">$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <TargetName>dojo_d</TargetName>
+    <TargetName>$(ProjectName)</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <TargetName>dojo</TargetName>
+    <TargetName>$(ProjectName)</TargetName>
     <RunCodeAnalysis>false</RunCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Publish|Win32'">
-    <TargetName>dojo</TargetName>
+    <TargetName>$(ProjectName)</TargetName>
     <RunCodeAnalysis>false</RunCodeAnalysis>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -229,7 +229,7 @@
     </ClCompile>
     <Lib>
       <AdditionalDependencies>zlibd.lib;zziplibd.lib;xinput.lib;OpenGL32.lib;glew32.lib;FreeImaged.lib;freetype.lib;OpenAL32.lib;libogg_static.lib;libvorbis_static.lib;libvorbisfile_static.lib;PocoFoundationd.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <OutputFile>$(OutDir)dojo_d.lib</OutputFile>
+      <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalLibraryDirectories>dependencies\win32\lib;dependencies\win32\lib\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
     <ProjectReference>
@@ -264,7 +264,7 @@
     </ClCompile>
     <Lib>
       <AdditionalDependencies>zlib.lib;zziplib.lib;xinput.lib;OpenGL32.lib;glew32.lib;FreeImage.lib;OpenAL32.lib;freetype.lib;libogg_static.lib;libvorbis_static.lib;libvorbisfile_static.lib;PocoFoundation.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <OutputFile>$(OutDir)dojo.lib</OutputFile>
+      <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalLibraryDirectories>dependencies\win32\lib;dependencies\win32\lib\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
     <ProjectReference>
@@ -299,7 +299,7 @@
     </ClCompile>
     <Lib>
       <AdditionalDependencies>zlib.lib;zziplib.lib;xinput.lib;OpenGL32.lib;glew32.lib;FreeImage.lib;OpenAL32.lib;freetype.lib;libogg_static.lib;libvorbis_static.lib;libvorbisfile_static.lib;PocoFoundation.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <OutputFile>$(OutDir)dojo.lib</OutputFile>
+      <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalLibraryDirectories>dependencies\win32\lib;dependencies\win32\lib\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
     <ProjectReference>

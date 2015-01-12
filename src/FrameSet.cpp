@@ -28,36 +28,36 @@ void FrameSet::setPreferredAnimationTime(float t) {
 	mPreferredAnimationTime = t;
 }
 
-void FrameSet::setAtlas( Table* atlasTable, ResourceGroup* atlasTextureProvider )
+void FrameSet::setAtlas( const Table& atlasTable, ResourceGroup& atlasTextureProvider )
 {
 	DEBUG_ASSERT( !isLoaded(), "setAtlas: this FrameSet is already loaded and can't be reset as an atlas" );
 
-	String atlasName = atlasTable->getString( "texture" );
-	FrameSet* atlasSet = atlasTextureProvider->getFrameSet( atlasName );	
+	String atlasName = atlasTable.getString( "texture" );
+	FrameSet* atlasSet = atlasTextureProvider.getFrameSet( atlasName );	
 
-	DEBUG_ASSERT_INFO( atlasSet, "The atlas Texture requested could not be found", "atlasName = " + atlasTable->getString( "texture" ) );
+	DEBUG_ASSERT_INFO( atlasSet, "The atlas Texture requested could not be found", "atlasName = " + atlasTable.getString( "texture" ) );
 
 	Texture* atlas = atlasSet->getFrame(0);
 
-	mPreferredAnimationTime = atlasTable->getNumber( "animationFrameTime" );
+	mPreferredAnimationTime = atlasTable.getNumber( "animationFrameTime" );
 	
-	Table* tiles = atlasTable->getTable( "tiles" );
+	auto& tiles = atlasTable.getTable( "tiles" );
 
 	int x, y, sx, sy;
-	for( int i = 0; i < tiles->getAutoMembers(); ++i )
+	for( int i = 0; i < tiles.getArrayLength(); ++i )
 	{
-		Table* tile = tiles->getTable( i );
+		auto& tile = tiles.getTable( i );
 
-		x = tile->getInt( 0 );
-		y = tile->getInt( 1 );
-		sx = tile->getInt( 2 );
-		sy = tile->getInt( 3 );
+		x = tile.getInt( 0 );
+		y = tile.getInt( 1 );
+		sx = tile.getInt( 2 );
+		sy = tile.getInt( 3 );
 
-		Texture* tiletex = new Texture();
+		auto tiletex = make_unique<Texture>();
 
 		tiletex->loadFromAtlas( atlas, x,y, sx,sy );
 
-		addTexture( tiletex, true );
+		addTexture( std::move(tiletex) );
 	}
 }
 
@@ -94,16 +94,19 @@ void FrameSet::onUnload(bool soft)
 	loaded = false;
 }
 
-void FrameSet::addTexture(Texture* t, bool owner /*= false */) {
-	DEBUG_ASSERT(t != nullptr, "Adding a NULL texture");
-	DEBUG_ASSERT(!owner || (owner && t->getOwnerFrameSet() == NULL), "This Texture already has an owner FrameSet");
-
-	if (owner)
-		t->_notifyOwnerFrameSet(this);
-
-	frames.add(t);
+void FrameSet::addTexture(Texture& t) {
+	frames.add(&t);
 }
 
-Texture* Dojo::FrameSet::getRandomFrame() {
+void FrameSet::addTexture(Unique<Texture> t) {
+	DEBUG_ASSERT(t != nullptr, "Adding a NULL texture");
+	DEBUG_ASSERT(t->getOwnerFrameSet() == NULL, "This Texture already has an owner FrameSet");
+	
+	t->_notifyOwnerFrameSet(this);
+
+	addTexture(*t.release());
+}
+
+Texture* FrameSet::getRandomFrame() {
 	return frames.at((int)Math::rangeRandom(0, (float)frames.size()));
 }

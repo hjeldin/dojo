@@ -42,20 +42,10 @@ namespace Dojo
 		virtual ~GameState();
         
 		///Registers an existing TouchArea in this GameState
-        void addTouchArea( TouchArea* t )
-        {
-            DEBUG_ASSERT( t != nullptr, "addTouchArea: area passed was null" );
-            
-            mTouchAreas.add( t );
-        }
+        void addTouchArea( TouchArea* t );
 
         ///Unregisters an existing TouchArea in this GameState
-        void removeTouchArea( TouchArea* t )
-        {
-            DEBUG_ASSERT( t != nullptr, "removeTouchArea: area passed was null" );
-            
-            mTouchAreas.remove( t );
-        }
+        void removeTouchArea( TouchArea* t );
 				
 		///Clears this GameState to a pre-initialization state
 		virtual void clear();
@@ -67,11 +57,11 @@ namespace Dojo
 		Viewport* getViewport()		{	return camera;			}
 		
 		///sets the primary Viewport (ie. camera) on this GameState, needed for pixel-perfect behaviour! (Sprites and TextAreas)
-		void setViewport( Viewport* v );
+		void setViewport( Viewport& v );
 		
 		///"touches" all the touchAreas with the given touch
 		/**touched TouchAreas will fire onTouchAreaPressed() on their listeners as soon as updateClickableState() is called*/
-		void touchAreaAtPoint( Touch* touch );        
+		void touchAreaAtPoint( const Touch& touch );        
 
 		///triggers all the TouchAreas to send their events if they were touched before the last updateClickableState call
         void updateClickableState();
@@ -89,7 +79,7 @@ namespace Dojo
 		
 	protected:
         
-        typedef Array< TouchArea* > TouchAreaList;
+        typedef std::vector< TouchArea* > TouchAreaList;
         
         TouchAreaList mTouchAreas;
 		

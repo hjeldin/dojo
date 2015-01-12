@@ -49,6 +49,16 @@ Resource(creator, filePath)
 	setIndexByteSize(sizeof(GLushort));
 }
 
+Mesh::~Mesh() {
+#ifndef DOJO_DISABLE_VAOS
+	if (vertexArrayDesc)
+		glDeleteVertexArrays(1, &vertexArrayDesc);
+#endif
+
+	if (loaded)
+		onUnload();
+}
+
 void Mesh::destroyBuffers() {
 	auto cleanup = std::move(vertices);
 	cleanup = std::move(indices);
@@ -117,7 +127,7 @@ void Mesh::setVertexFieldEnabled(VertexField f) {
 	vertexSize += VERTEX_FIELD_SIZES[(byte)f];
 }
 
-void Mesh::setVertexFields(std::initializer_list<VertexField> fs) {
+void Mesh::setVertexFields(const std::initializer_list<VertexField>& fs) {
 	for (auto f : fs)
 		setVertexFieldEnabled(f);
 }
@@ -167,7 +177,7 @@ void Mesh::_prepareVertex(const Vector& v)
 	++vertexCount;
 }
 
-void Mesh::vertex( float x, float y )
+int Mesh::vertex( float x, float y )
 {				
 	_prepareVertex(Vector(x,y));
 
@@ -175,9 +185,11 @@ void Mesh::vertex( float x, float y )
 
 	ptr[0] = x;
 	ptr[1] = y;
+
+	return getVertexCount() - 1;
 }
 
-void Mesh::vertex(const Vector& v) 
+int Mesh::vertex(const Vector& v) 
 {
 	_prepareVertex(v);
 
@@ -189,6 +201,13 @@ void Mesh::vertex(const Vector& v)
 		ptr[0] = v.x;
 		ptr[1] = v.y;
 	}
+
+	return getVertexCount() - 1;
+}
+
+int Mesh::vertex(float x, float y, float z)
+{
+	return vertex(Vector(x, y, z));
 }
 
 byte& Mesh::_offset(VertexField f) {
@@ -229,17 +248,16 @@ int Mesh::getPrimitiveCount() const {
 	}
 }
 
-void Mesh::vertex( float x, float y, float z )
-{		
-	vertex(Vector(x, y, z));
-}
-
 void Mesh::uv(float u, float v, byte set /*= 0 */) {
 	DEBUG_ASSERT(isEditing(), "uv: this Mesh is not in Edit mode");
 
 	float* ptr = (float*)(currentVertex + _offset(VertexField::UV0, set));
 	ptr[0] = u;
 	ptr[1] = v;
+}
+
+void Mesh::uv(const Vector& uv, byte set /* = 0 */) {
+	this->uv(uv.x, uv.y, set);
 }
 
 void Mesh::color(const Color& c) {
@@ -439,7 +457,7 @@ bool Mesh::onLoad()
 
 	//load binary mesh
 	char* data;
-	Platform::getSingleton()->loadFileContent( data, filePath );
+	Platform::singleton().loadFileContent( data, filePath );
 		
 	DEBUG_ASSERT_INFO( data, "onLoad: cannot find or read file", "path = " + filePath );
 	
@@ -527,7 +545,7 @@ Vector& Mesh::getVertex(int idx) {
 	return *(Vector*)ptr;
 }
 
-void Dojo::Mesh::setIndex(int idxidx, IndexType idx) {
+void Mesh::setIndex(int idxidx, IndexType idx) {
 	DEBUG_ASSERT(idxidx >= 0 && idxidx < getIndexCount(), "Index out of bounds");
 
 	switch (indexSize)
@@ -597,7 +615,7 @@ void Mesh::cutSection(IndexType i1, IndexType i2) {
 	//TODO recompute max and min
 }
 
-std::unique_ptr<Mesh> Mesh::cloneWithSameFormat() const {
+Unique<Mesh> Mesh::cloneWithSameFormat() const {
 	auto c = make_unique<Mesh>();
 
 	c->setIndexByteSize(indexSize);
@@ -608,7 +626,7 @@ std::unique_ptr<Mesh> Mesh::cloneWithSameFormat() const {
 	return c;
 }
 
-std::unique_ptr<Mesh> Dojo::Mesh::cloneFromSlice(IndexType vertexStart, IndexType vertexEnd, const Vector& translation /*= Vector::ZERO*/) const {
+Unique<Mesh> Mesh::cloneFromSlice(IndexType vertexStart, IndexType vertexEnd, const Vector& translation /*= Vector::ZERO*/) const {
 	DEBUG_ASSERT(!vertices.empty(), "This mesh is empty");
 	DEBUG_ASSERT(vertexStart < getVertexCount() && vertexEnd <= getVertexCount() && vertexStart <= vertexEnd, "Indices out of bounds");
 

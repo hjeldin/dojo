@@ -17,7 +17,7 @@
 
 namespace Dojo 
 {
-	class Render;
+	class Renderer;
 	
 	class Renderable : public RenderState, public Object
 	{				
@@ -45,7 +45,7 @@ namespace Dojo
 		void stopFade();
 		
 		///returns the ID of the Render::Layer this object is assigned to
-		int getLayer()				{	return layer;			}
+		int getLayer()	const			{	return layer;			}
 		int getRenderingOrder()		{	return renderingOrder;	}
 
 		///true if this object has been assigned to a Render::Layer
@@ -57,25 +57,17 @@ namespace Dojo
 		bool isFading()	const			{	return fading;			}
         
         virtual bool isRenderable()         {   return true;            }
-					
-		bool isInView()
-		{
-			return !mCulled;
-		}
-
+		
 		void advanceFade( float dt );
 		
 		virtual void onAction( float dt );		
 		
-		void _notifyRenderInfo( Render* r, int layerID, int renderIdx );
-		
-		void _notifyCulled( bool culled );
-		
+		void _notifyRenderInfo( Renderer* r, int layerID, int renderIdx );
 	protected:
 		
 		bool visible;
 		
-		Render* render;
+		Renderer* render;
 		int layer;
 		int renderingOrder;
 		
@@ -84,9 +76,5 @@ namespace Dojo
 		float fadeEndTime;
 		Color fadeStartColor;
 		Color fadeEndColor;	
-		
-	private:
-		
-		bool mCulled;
 	};
 }

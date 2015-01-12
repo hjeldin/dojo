@@ -9,7 +9,6 @@
 namespace Dojo
 {
 	class Renderable;
-	class Render;
 	class ShaderProgram;
 	class Table;
 
@@ -25,7 +24,7 @@ namespace Dojo
 		/**
 		\remark the type of the data is deduced from the types in .ps and the .vs, so it is important to return the right kind of data
 		*/
-		typedef std::function< const void*( Renderable* ) > UniformCallback;
+		typedef std::function< const void*( const Renderable& ) > UniformCallback;
 
 		///A built-in uniform is a uniform shader parameter which Dojo recognizes and provides to the shader being run
 		enum BuiltInUniform
@@ -51,7 +50,8 @@ namespace Dojo
 			BU_VIEW_DIRECTION,	///<The current world-space direction of the view (vec3)
 			
 			BU_TIME,		///<Time in seconds since the start of the program (float)
-			BU_TARGET_DIMENSION	///<The dimensions in pixels of the currently bound target (vec2)
+			BU_TARGET_DIMENSION,	///<The dimensions in pixels of the currently bound target (vec2)
+			BU_TARGET_PIXEL   ///<The dimension in the UV space of one pixel
 		};
 
 		///A VertexAttribute represents a "attribute" binding in a vertex shader
@@ -80,7 +80,7 @@ namespace Dojo
 		typedef std::unordered_map< std::string, VertexAttribute > NameAttributeMap;
 
 		///Creates a new Shader from a file path
-		Shader( Dojo::ResourceGroup* creator, const String& filePath );
+		Shader( ResourceGroup* creator, const String& filePath );
 
 		///Assigns this data source (Binder) to the Uniform with the given name
 		/**
@@ -106,7 +106,7 @@ namespace Dojo
 		}
 
 		///binds the shader to the OpenGL state with the object that is using it
-		virtual void use( Renderable* user );
+		virtual void use( const Renderable& user );
 
 		virtual bool onLoad();
 
@@ -164,11 +164,9 @@ namespace Dojo
 		ShaderProgram* pProgram[ (byte)ShaderProgramType::_Count ];
 		bool mOwnsProgram[ (byte)ShaderProgramType::_Count ];
 
-		Render* pRender;
-
 		void _assignProgram(const Table& desc, ShaderProgramType type);
         
-        const void* _getUniformData( const Uniform& uniform, Renderable* user );
+        const void* _getUniformData( const Uniform& uniform, const Renderable& user );
 
 	private:
 	};

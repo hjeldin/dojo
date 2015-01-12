@@ -20,10 +20,11 @@
 
 namespace Dojo 
 {	
-	class Render;
+	class Renderer;
 	class GameState;
 	class AnimatedQuad;
 	class Renderable;
+	class RenderLayer;
 	class Texture;
 		
 	///A Viewport is a View in a Dojo GameState, working both in 2D and 3D
@@ -62,15 +63,18 @@ namespace Dojo
 
 		///sets the texture to be used as rendering target, null means "render to screen"
 		void setRenderTarget( Texture* target );
-        
+
 		///sets which subset of Render Layers this Viewport is able to "see"
-		void setVisibleLayers( const LayerList& layers );
+		void setVisibleLayers(const LayerList& layers);
+
+		///sets which subset of Render Layers this Viewport is able to "see"
+		void setVisibleLayers(int min, int max);
 
 		///returns the subset of visible layers that has been set by setVisibleLayers
 		/**
 		by default, the set is empty, which means "all layers"
 		*/
-		const LayerList& getVisibleLayers()
+		const LayerList& getVisibleLayers() const
 		{
 			return mLayerList;
 		}
@@ -81,12 +85,9 @@ namespace Dojo
 		This is useful when fitting a fixed-scale pixel-perfect scene inside a resizable window.
 		*/
 		void setTargetSize( const Vector& size )		{ targetSize = size; }
-
-		///enables or disables 3D culling of hidden objects
-		void setCullingEnabled( bool state )		{	cullingEnabled = state;	}
 		
 		const Color& getClearColor()				{	return clearColor;	}
-		Renderable* getFader()					{	return fadeObject;	}
+		Renderable* getFader()					{	return faderObject;	}
 		float getVFOV()							{	return VFOV;		}
 		float getZFar()							{	return zFar;		}
 		float getZNear()							{	return zNear;		}
@@ -94,6 +95,14 @@ namespace Dojo
 		const Vector* getLocalFrustumVertices()	{	return localFrustumVertices;	}
 		const Vector& getTargetSize()			{   return targetSize;  }
 		const Matrix& getViewTransform()			{	return mViewTransform;	}
+
+		void setClearEnabled(bool enabled) {
+			enableClear = enabled;
+		}
+
+		bool getClearEnabled() const {
+			return enableClear;
+		}
 
 		///returns the Texture this Viewport draws to
 		Texture* getRenderTarget()
@@ -116,16 +125,11 @@ namespace Dojo
             return mFrustumTransform;
         }
 
-		bool isContainedInFrustum( Renderable* r );
+		bool isContainedInFrustum( const Renderable& r ) const;
 
-		bool isSeeing( Renderable* s );
+		bool isVisible( Renderable& s );
 
-		bool touches( Renderable* r )
-		{
-			DEBUG_ASSERT( r != nullptr, "touches: null renderable passed" );
-
-			return Math::AABBsCollide( r->getWorldMax(), r->getWorldMin(), getWorldMax(), getWorldMin() );
-		}
+		bool isInViewRect( const Renderable& r ) const;
 		
 		///returns the world position of the given screenPoint
 		Vector makeWorldCoordinates( const Vector& screenPoint )
@@ -146,7 +150,7 @@ namespace Dojo
 		///converts the texture pixel sizes in a screen space size
 		void makeScreenSize( Vector& dest, Texture* tex );
 		
-		float getPixelSide()
+		float getPixelSide() const
 		{
 			return size.x / targetSize.x;
 		}
@@ -162,17 +166,16 @@ namespace Dojo
 		
 		Vector targetSize;
 
-		bool cullingEnabled;
+		bool enableClear = true, frustumDirty = true;
+
+		Matrix lastWorldTransform;
 		
-		Renderable* fadeObject;
+		Renderable* faderObject = nullptr;
 				
 		Color clearColor;
         
         Matrix mViewTransform, mOrthoTransform, mFrustumTransform, mPerspectiveEyeTransform;
-
-		//frustum data
-		bool frustumCullingEnabled;
-
+		
 		Vector localFrustumVertices[4];
 		Vector worldFrustumVertices[4];
 

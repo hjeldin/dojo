@@ -37,35 +37,35 @@
 
 using namespace Dojo;
 
-Platform * Platform::singleton = NULL;
+Unique<Platform> Platform::singletonPtr;
 
-Platform* Platform::create( const Table & config )
+Platform& Platform::create( const Table& config /*= Table::EMPTY_TABLE */ )
 { 
 #if defined (PLATFORM_WIN32)
-    singleton = new Win32Platform( config );
+	singletonPtr = make_unique<Win32Platform>(config);
     
 #elif defined( PLATFORM_OSX )
-    singleton = new OSXPlatform( config );
+	singletonPtr = make_unique<OSXPlatform>(config);
     
 #elif defined( PLATFORM_IOS )
-    singleton = new IOSPlatform( config );
+	singletonPtr = make_unique<IOSPlatform>(config);
     
 #elif defined( PLATFORM_LINUX )
-    singleton = new LinuxPlatform( config );
+	singletonPtr = make_unique<LinuxPlatform>(config);
     
 #elif defined( PLATFORM_ANDROID )
     android_main(NULL); //HACK
-    singleton = new AndroidPlatform( config );
+	singletonPtr = make_unique<AndroidPlatform>(config);
 	
 #endif
-	return singleton;
+	return *singletonPtr;
 }
 
 void Platform::shutdownPlatform()
 {
-	singleton->shutdown();
+	singleton().shutdown();
 
-	SAFE_DELETE( singleton );
+	singletonPtr.reset();
 }
 
 Platform::Platform( const Table& configTable ) :
@@ -277,7 +277,7 @@ Platform::FilePtr Platform::getFile( const String& path )
 
 int Platform::loadFileContent( char*& bufptr, const String& path )
 {
-	auto file = std::unique_ptr<FileStream>( getFile( path ) );
+	auto file = Unique<FileStream>( getFile( path ) );
 	int size = 0;
 	if( file->open() )
 	{
@@ -290,42 +290,32 @@ int Platform::loadFileContent( char*& bufptr, const String& path )
 	return size;
 }
 
-String Platform::_getTablePath( Table* dest, const String& absPath )
+String Platform::_getTablePath( const String& absPathOrName )
 {
-	if( absPath.size() == 0 )
-	{
-		DEBUG_ASSERT( dest->hasName(), "Cannot get a path for an unnamed table" );
-		
-		//look for this file inside the prefs
-		return getAppDataPath() + '/' + dest->getName() + ".ds";
-	}
+	DEBUG_ASSERT(absPathOrName.size() > 0, "Cannot get a path for an unnamed table");
+	
+	if (Utils::isAbsolutePath(absPathOrName))
+		return absPathOrName;
 	else
-		return absPath;
+		//look for this file inside the prefs
+		return getAppDataPath() + '/' + absPathOrName + ".ds";
 }
 
-void Platform::load( Table* dest, const String& absPath )
-{
-	DEBUG_ASSERT( dest, "Destination table is null" );
-	
-	using namespace std;
-	
+Table Platform::load(const String& absPathOrName)
+{		
 	String buf;
-	String path = _getTablePath( dest, absPath );
+	String path = _getTablePath(absPathOrName);
 	
-	Table::loadFromFile( dest, path );
+	return Table::loadFromFile( path );
 }
 
-void Platform::save( Table* src, const String& absPath )
+void Platform::save(const Table& src, const String& absPathOrName)
 {
-	DEBUG_ASSERT( src, "The table to be saved is null" );
-	
-	using namespace std;
-	
 	String buf;
 	
-	src->serialize( buf );
+	src.serialize( buf );
 	
-	String path = _getTablePath(src, absPath);
+	String path = _getTablePath(absPathOrName);
 
 	DEBUG_MESSAGE( path.ASCII() );
 	FILE* f = fopen( path.ASCII().c_str(), "w+" );

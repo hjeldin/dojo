@@ -48,7 +48,7 @@ void SoundSource::setVolume( float v )
 		alSourcef(
 			source, 
 			AL_GAIN, 
-			baseVolume * Platform::getSingleton()->getSoundManager()->getMasterVolume());
+			baseVolume * Platform::singleton().getSoundManager().getMasterVolume());
 	}
 }
 
@@ -60,7 +60,7 @@ float SoundSource::getVolume()
 void SoundSource::play( float volume )
 {
 	//can the sound play?
-	if( !isValid() && buffer && buffer->isLoaded() && Platform::getSingleton()->getSoundManager()->getMasterVolume() > 0 )
+	if( !isValid() && buffer && buffer->isLoaded() && Platform::singleton().getSoundManager().getMasterVolume() > 0 )
 		return;
 
 	if(state == SS_INITIALISING)
@@ -210,21 +210,21 @@ void SoundSource::_update(float dt)
 	}
 }
 
-void Dojo::SoundSource::setPitch(float p)
+void SoundSource::setPitch(float p)
 {
 	pitch = p;
 	if (isActive())
 		alSourcef(source, AL_PITCH, pitch);
 }
 
-void Dojo::SoundSource::setLooping(bool l)
+void SoundSource::setLooping(bool l)
 {
 	looping = l;
 	if (isActive()) //do not use this looping flag on streaming sounds, we handle it in the update 
 		alSourcei(source, AL_LOOPING, isStreaming() ? false : looping);
 }
 
-void Dojo::SoundSource::stop() {
+void SoundSource::stop() {
 
 	if (isActive()) {
 		alSourceStop(source);
@@ -237,7 +237,7 @@ void Dojo::SoundSource::stop() {
 	}
 }
 
-float Dojo::SoundSource::getElapsedTime() {
+float SoundSource::getElapsedTime() {
 	float elapsed = 0;
 	alGetSourcef(source, AL_SEC_OFFSET, &elapsed);
 

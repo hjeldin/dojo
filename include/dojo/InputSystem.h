@@ -91,7 +91,7 @@ namespace Dojo
 		void _fireScrollWheelEvent( float scroll );		
 		
 		void _fireShakeEvent();		
-		void _fireAccelerationEvent( const Dojo::Vector& accel, float roll );
+		void _fireAccelerationEvent( const Vector& accel, float roll );
 
 	protected:
 		
@@ -100,7 +100,7 @@ namespace Dojo
 		ListenerList listeners;
 		
 		TouchList mTouchList;        
-		int mAssignedTouches;
+		size_t mAssignedTouches = 0;
 
 		DeviceList mDeviceList;
 				
@@ -112,8 +112,8 @@ namespace Dojo
 		
 		Touch* _popExistingTouch(const Vector& point, Touch::Type type);
 
-		void _fireDeviceConnected( Dojo::InputDevice* j );
-		void _fireDeviceDisconnected( Dojo::InputDevice* j );
+		void _fireDeviceConnected( InputDevice* j );
+		void _fireDeviceDisconnected( InputDevice* j );
 
 	};
 }

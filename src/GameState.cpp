@@ -19,8 +19,6 @@ game( parentGame ),
 timeElapsed(0),
 camera(nullptr)
 {
-	mNeedsAABB = true;
-
 	gameState = this; //useful to pass a GameState around as an Object
 }
 
@@ -31,26 +29,24 @@ GameState::~GameState()
 
 void GameState::clear()
 {		
-	destroyAllChilds();
+	destroyAllChildren();
 
 	//flush resources
 	unloadResources( false );
 }
 
-void GameState::setViewport( Viewport* v )
+void GameState::setViewport( Viewport& v )
 {
-	DEBUG_ASSERT( v, "can't set a null viewport" );
+	camera = &v;
 	
-	camera = v;
-	
-	Platform::getSingleton()->getRender()->addViewport( v );
+	Platform::singleton().getRenderer().addViewport( v );
 }
 
-void GameState::touchAreaAtPoint( Touch* touch )
+void GameState::touchAreaAtPoint( const Touch& touch )
 {
-	Vector pointer = getViewport()->makeWorldCoordinates( touch->point );
+	Vector pointer = getViewport()->makeWorldCoordinates( touch.point );
 
-	Dojo::Array< TouchArea* > layer;
+	Array< TouchArea* > layer;
 	int topMostLayer = INT32_MIN;
 	
 	for( auto t : mTouchAreas )
@@ -69,23 +65,34 @@ void GameState::touchAreaAtPoint( Touch* touch )
 
 	//trigger all the areas overlapping in the topmost layer 
 	for( int i = 0; i < layer.size(); ++i )
-		layer[i]->_incrementTouches( *touch );	
+		layer[i]->_incrementTouches( touch );	
+}
+
+void GameState::addTouchArea(TouchArea* t) {
+	DEBUG_ASSERT(t != nullptr, "addTouchArea: area passed was null");
+
+	mTouchAreas.push_back(t);
+}
+
+void GameState::removeTouchArea(TouchArea* t) {
+	DEBUG_ASSERT(t != nullptr, "removeTouchArea: area passed was null");
+
+	auto elem = std::find(mTouchAreas.begin(), mTouchAreas.end(), t);
+	if (elem != mTouchAreas.end())
+		mTouchAreas.erase(elem);
 }
 
 void GameState::updateClickableState()
 {
-	if( !childs )
-		return;
-
 	//clear all the touchareas
 	for( auto ta : mTouchAreas )
 		ta->_clearTouches();
 	
-	const InputSystem::TouchList& touchList = Platform::getSingleton()->getInput()->getTouchList();
+	const InputSystem::TouchList& touchList = Platform::singleton().getInput().getTouchList();
 		
 	//"touch" all the touchareas active in this frame
 	for( auto touch : touchList )
-		touchAreaAtPoint( touch );
+		touchAreaAtPoint( *touch );
 	
 	///launch events
 	for( auto ta : mTouchAreas )

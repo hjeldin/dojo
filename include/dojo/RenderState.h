@@ -15,27 +15,18 @@
 #include "Vector.h"
 #include "Array.h"
 #include "dojomath.h"
+#include "BlendingMode.h"
 
 namespace Dojo
 {
 	class Texture;
 	class Mesh;
 	class Shader;
-	
+
 	///A render state is responsibile of managing the state of the underlying OGL render minimising the changes to be done when it is activated
 	class RenderState 
 	{
 	public:
-
-		///an enum describing high-level photoshop-like blending modes
-		enum BlendingMode
-		{
-			BM_ALPHA,
-			BM_MULTIPLY,
-			BM_ADD,
-			BM_INVERT
-		};
-
 		class TextureUnit
 		{
 		public:
@@ -81,9 +72,9 @@ namespace Dojo
 				return rotation;
 			}
 
-			const Matrix& getTransform();
+			const Matrix& getTransform() const;
 
-			bool isTransformRequired()
+			bool isTransformRequired() const
 			{
 				return optTransform != nullptr;
 			}
@@ -108,7 +99,7 @@ namespace Dojo
 				
 		Color color;
 
-		GLenum srcBlend, destBlend, blendEquation;
+		GLenum srcBlend, destBlend, blendFunction;
 
 		CullMode cullMode;
 
@@ -148,12 +139,12 @@ namespace Dojo
 		*/
 		void setShader( Shader* shader );
 				
-		Texture* getTexture( int ID = 0 );
+		Texture* getTexture( int ID = 0 ) const;
 
-		TextureUnit* getTextureUnit( int ID );
+		const TextureUnit& getTextureUnit( int ID ) const;
 
 		///returns the Mesh currently used by this state
-		Mesh* getMesh()								{	return mesh;			}
+		Mesh* getMesh()	const							{	return mesh;			}
 
 		///returns the Shader currently bound to this state
 		Shader* getShader()
@@ -174,14 +165,8 @@ namespace Dojo
 		
 		void applyState();
 		
-		void commitChanges( RenderState* nextState );
+		void commitChanges();
 
-		///sets up destBlend and srcBlend to use normal alpha blending
-		void useAlphaBlend();
-
-		///sets up destBlend and srcBlend to use alpha+additive blending
-		void useAdditiveBlend();
-				
 	protected:
 			
 		bool blendingEnabled;

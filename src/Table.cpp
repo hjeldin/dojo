@@ -6,13 +6,16 @@
 
 using namespace Dojo;
 
-void Table::loadFromFile( Table* dest, const String& path )
+const Table Table::EMPTY;
+const Table::Data Table::Data::EMPTY = Data(0, 0);
+
+Table Table::loadFromFile( const String& path )
 {
-	DEBUG_ASSERT( dest != nullptr, "The destination table is null" );
 	DEBUG_ASSERT( path.size(), "Tried to load a Table from an empty path string" );
 
-    auto file = Platform::getSingleton()->getFile( path );
+    auto file = Platform::singleton().getFile( path );
 	
+	Table dest;
 	if( file->open() )
 	{
 		//read the contents directly in a string
@@ -21,17 +24,12 @@ void Table::loadFromFile( Table* dest, const String& path )
 
 		file->read( (byte*)buf.c_str(), buf.size() );
 
-		dest->setName( Utils::getFileName( path ) );
-
 		StringReader reader( buf );
-		dest->deserialize( reader );
+		dest.deserialize( reader );
 	}
+
+	return dest;
 }
-
-Table Table::EMPTY_TABLE = Table( "EMPTY_TABLE" );
-
-const Table::Data Table::EMPTY_DATA = Data(0,0);
-
 
 bool Table::onLoad()
 {
@@ -41,7 +39,7 @@ bool Table::onLoad()
 	if( !isReloadable() )
 		return false;
 
-	Platform::getSingleton()->load( this, filePath );
+	*this = Platform::singleton().load( filePath );
 
 	return (loaded = !isEmpty());
 }
@@ -58,7 +56,7 @@ void Table::serialize( String& buf, String indent ) const
 	
 	for( ; itr != map.end(); ++itr ) 
 	{
-		Entry* e = itr->second;
+		auto& e = *itr->second;
 
 		if( indent.size() )
 			buf += indent;
@@ -67,16 +65,16 @@ void Table::serialize( String& buf, String indent ) const
 		if( itr->first[0] != '_' )
 			buf += itr->first + " = ";
 
-		switch( e->type )
+		switch( e.type )
 		{
 		case FT_NUMBER:
-			buf.appendFloat( *((float*)e->getRawValue() ) );
+			buf.appendFloat( *((float*)e.getRawValue() ) );
 			break;
 		case FT_STRING:
-			buf += '\"' + *((String*)e->getRawValue() ) + '\"';
+			buf += '\"' + *((String*)e.getRawValue() ) + '\"';
 			break;
 		case FT_VECTOR:
-			v = (Vector*)e->getRawValue();
+			v = (Vector*)e.getRawValue();
 			buf += '(';
 			buf.appendFloat( v->x );
 			buf += ' ';
@@ -87,7 +85,7 @@ void Table::serialize( String& buf, String indent ) const
 
 			break;
 		case FT_DATA:
-			data = (Data*)e->getRawValue();
+			data = (Data*)e.getRawValue();
 			buf += '#' + String( data->size ) + ' ';
 
 			buf.appendRaw( data->ptr, data->size );
@@ -95,7 +93,7 @@ void Table::serialize( String& buf, String indent ) const
 			break;
 		case FT_TABLE:
 			buf += String( "{\n" );
-			((Table*)e->getRawValue())->serialize( buf, indent + '\t' );
+			((Table*)e.getRawValue())->serialize( buf, indent + '\t' );
 
 			buf += indent + '}';
 
@@ -163,7 +161,6 @@ void Table::deserialize( StringReader& buf )
 	float number;
 	Vector vec;
 	Data data;
-	Table* table;
 	Color col;
 
 	//clear old
@@ -295,13 +292,13 @@ void Table::deserialize( StringReader& buf )
 			set(curName, data.ptr, data.size, true); //always retain deserialized data
 			break;
 
-		case PT_CHILD:
+		case PT_CHILD: {
 
-			table = createTable(curName);
-			table->deserialize( buf );
-
-			break;
-        default: ;
+			createTable(curName).deserialize(buf);
+		}
+		break;
+        
+		default: ;
 		}
 
 		if( target ) //read something
@@ -311,4 +308,230 @@ void Table::deserialize( StringReader& buf )
 			curName.clear();
 		}
 	}
+}
+
+Table::Table() :
+unnamedMembers(0) {
+
+}
+
+Table::Table(Table&& t) :
+unnamedMembers(t.unnamedMembers),
+map(std::move(t.map)) {
+	t.unnamedMembers = 0;
+}
+
+Table::Table(const Table& t) :
+unnamedMembers(t.unnamedMembers) {
+	//deep copy
+	for (auto& pair : t.map)
+		map[pair.first] = pair.second->clone();
+}
+
+Table::Table(ResourceGroup* creator, const String& path) :
+Resource(creator, path),
+unnamedMembers(0) {
+
+}
+
+Table& Table::operator=(Table&& t) {
+	unnamedMembers = t.unnamedMembers;
+	map = std::move(t.map);
+	return *this;
+}
+
+Table::~Table() {
+	clear();
+}
+
+void Table::onUnload(bool soft /*= false */) {
+	if (!soft || isReloadable())
+	{
+		clear();
+
+		loaded = false;
+	}
+}
+
+Table* Table::getParentTable(const String& key, String& realKey) const {
+	size_t dotIdx = 0;
+	for (; dotIdx < key.size() && key[dotIdx] != '.'; ++dotIdx);
+
+	if (dotIdx == key.size())
+	{
+		realKey = key;
+		return (Table*)this;
+	}
+
+	String partialKey = key.substr(dotIdx + 1);
+	String childName = key.substr(0, dotIdx);
+	auto& child = getTable(childName);
+
+	DEBUG_ASSERT_INFO(child.size() > 0, "A part of a dot-formatted key referred to a non-existing table", "childName = " + childName);
+
+	return child.getParentTable(partialKey, realKey);
+}
+
+Table& Table::createTable(const String& key /*= String::EMPTY */) {
+	String name;
+
+	if (key.size() == 0)
+		name = autoname();
+	else
+		name = key;
+
+	set(name, Table());
+
+	return get(name)->getAsTable(); //TODO don't do another search
+}
+
+void Table::clear() {
+	unnamedMembers = 0;
+
+	map.clear();
+}
+
+void Table::inherit(Table* t) {
+	DEBUG_ASSERT(t != nullptr, "Cannot inherit a null Table");
+
+	//for each map member of the other map
+	EntryMap::iterator itr = t->map.begin(),
+		end = t->map.end(),
+		existing;
+	for (; itr != end; ++itr)
+	{
+		existing = map.find(itr->first); //look for a local element with the same name
+
+		//element exists - do nothing except if it's a table
+		if (existing != map.end())
+		{
+			//if it's a table in both tables, inherit
+			if (itr->second->type == FT_TABLE && existing->second->type == FT_TABLE)
+				((Table*)existing->second->getRawValue())->inherit((Table*)itr->second->getRawValue());
+		}
+		else //just clone
+			map[itr->first] = itr->second->clone();
+	}
+}
+
+bool Table::exists(const String& key) const {
+	DEBUG_ASSERT(key.size(), "exists: key is empty");
+
+	return map.find(key) != map.end();
+}
+
+bool Table::existsAs(const String& key, FieldType t) const {
+	EntryMap::const_iterator itr = map.find(key);
+
+	if (itr != map.end())
+		return itr->second->type == t;
+	
+	return false;
+}
+
+Table::Entry* Table::get(const String& key) const {
+	String actualKey;
+	const Table* container = getParentTable(key, actualKey);
+
+	if (!container)
+		return nullptr;
+
+	auto elem = container->map.find(actualKey);
+	return elem != container->map.end() ? elem->second.get() : nullptr;
+}
+
+float Table::getNumber(const String& key, float defaultValue /*= 0 */) const {
+	Entry* e = get(key);
+	if (e && e->type == FT_NUMBER)
+		return e->getAsNumber();
+	else
+		return defaultValue;
+}
+
+float Table::getNumber(int idx) const {
+	return getNumber(autoMemberName(idx));
+}
+
+int Table::getInt(const String& key, int defaultValue /*= 0 */) const {
+	return (int)getNumber(key, (float)defaultValue);
+}
+
+bool Table::getBool(const String& key, bool defaultValue /*= false */) const {
+	Entry* e = get(key);
+	if (e && e->type == FT_NUMBER)
+		return e->getAsNumber() > 0;
+	else
+		return defaultValue;
+}
+
+const String& Table::getString(const String& key, const String& defaultValue /*= String::EMPTY */) const {
+	Entry* e = get(key);
+	if (e && e->type == FT_STRING)
+		return e->getAsString();
+	else
+		return defaultValue;
+}
+
+const Vector& Table::getVector(const String& key, const Vector& defaultValue /*= Vector::ZERO */) const {
+	Entry* e = get(key);
+	if (e && e->type == FT_VECTOR)
+		return e->getAsVector();
+	else
+		return defaultValue;
+}
+
+const Color Table::getColor(const String& key, const Color& defaultValue /*= Color::BLACK */) const {
+	Entry* e = get(key);
+	if (e && e->type == FT_VECTOR)
+		return Color(e->getAsVector(), defaultValue.a);
+	else
+		return defaultValue;
+}
+
+const Table& Table::getTable(const String& key) const {
+	Entry* e = get(key);
+	if (e && e->type == FT_TABLE)
+		return e->getAsTable();
+	else
+		return EMPTY;
+}
+
+const Table::Data& Table::getData(const String& key) const {
+	Entry* e = get(key);
+	if (e && e->type == FT_DATA)
+		return e->getAsData();
+	else
+		return Data::EMPTY;
+}
+
+String Table::autoMemberName(int idx) const {
+	DEBUG_ASSERT(idx >= 0, "autoMemberName: idx is negative");
+	DEBUG_ASSERT_INFO(idx < getArrayLength(), "autoMemberName: idx is OOB", String("idx = ") + idx);
+
+	return '_' + String(idx);
+}
+
+void Table::remove(const String& key) {
+	map.erase(key);
+}
+
+void Table::remove(int idx) {
+	map.erase(autoMemberName(idx));
+}
+
+String Table::toString() const {
+	String str;
+	serialize(str);
+
+	return str;
+}
+
+void Table::debugPrint() const {
+#ifdef _DEBUG			
+	DEBUG_MESSAGE(toString());
+#endif
+}
+
+String Table::autoname() {
+	return '_' + String(unnamedMembers++);
 }

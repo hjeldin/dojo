@@ -175,7 +175,7 @@ void Font::Character::init( Page* p, unichar c, int x, int y, int sx, int sy, FT
 		Timer timer;
 
 		DEBUG_ASSERT( outline, "No outline provided but the font should be tesselated" );
-		mTesselation = std::unique_ptr< Tessellation >( new Tessellation() );
+		mTesselation = Unique< Tessellation >( new Tessellation() );
 
 		//find the normalizing scale and call the tesselation functions
 		gCurrentScale = (float)FONT_PPI / (float)fw;
@@ -219,7 +219,7 @@ bool Font::Page::onLoad()
 	int sx = font->mCellWidth * FONT_PAGE_SIDE;
 	int sy = font->mCellHeight * FONT_PAGE_SIDE;
 
-	bool npot = Platform::getSingleton()->isNPOTEnabled();
+	bool npot = Platform::singleton().isNPOTEnabled();
 	int sxp2 = npot ? sx : Math::nextPowerOfTwo( sx );
 	int syp2 = npot ? sy : Math::nextPowerOfTwo( sy );
 
@@ -359,10 +359,7 @@ bool Font::onLoad()
 {
 	DEBUG_ASSERT( !isLoaded(), "onLoad: this font is already loaded" );
 
-	Table t;
-	Platform::getSingleton()->load( &t, filePath );
-
-	fontName = t.getName();
+	Table t = Platform::singleton().load( filePath );
 
 	fontFile = Utils::getDirectory( filePath ) + '/' + t.getString( "truetype" );
 	fontWidth = fontHeight = t.getInt( "size" );	
@@ -381,11 +378,11 @@ bool Font::onLoad()
 	mCellWidth = fontWidth + glowRadius * 2;
 	mCellHeight = fontHeight + glowRadius * 2;
 
-	face = Platform::getSingleton()->getFontSystem()->getFace( fontFile );
+	face = Platform::singleton().getFontSystem().getFace( fontFile );
 
-	Table* preload = t.getTable( "preloadedPages" );
-	for( int i = 0; i < preload->getAutoMembers(); ++i )
-		getPage( preload->getInt( i ) );
+	auto& preload = t.getTable( "preloadedPages" );
+	for( int i = 0; i < preload.getArrayLength(); ++i )
+		getPage( preload.getInt( i ) );
 
 	//load existing pages that were trimmed during a previous unload
 	for( auto& pair : pages )

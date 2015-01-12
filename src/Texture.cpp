@@ -48,6 +48,9 @@ Texture::~Texture()
 {
 	if( OBB )
 		SAFE_DELETE( OBB );
+
+	if (loaded)
+		onUnload();
 }
 
 void Texture::bind( GLuint index )
@@ -195,7 +198,7 @@ bool Texture::loadEmpty( int w, int h, GLenum destFormat )
 	int destWidth, destHeight;
 
 	//if the platforms supports NPOT, or the dimensions are already POT, direct copy
-	if( !npot || Platform::getSingleton()->isNPOTEnabled() )
+	if( !npot || Platform::singleton().isNPOTEnabled() )
 	{
 		destWidth = width;
 		destHeight = height;
@@ -260,7 +263,7 @@ bool Texture::loadFromFile( const String& path )
 
 	GLenum sourceFormat = 0, destFormat;
 	int pixelSize;
-	sourceFormat = Platform::getSingleton()->loadImageFile( imageData, path, width, height, pixelSize );
+	sourceFormat = Platform::singleton().loadImageFile( imageData, path, width, height, pixelSize );
 	
 	DEBUG_ASSERT_INFO( sourceFormat, "Cannot load an image file", "path = " + path );
 	

@@ -6,7 +6,7 @@
 #include "Renderable.h"
 #include "GameState.h"
 #include "Viewport.h"
-#include "Render.h"
+#include "Renderer.h"
 #include "Texture.h"
 
 using namespace Dojo;
@@ -35,7 +35,8 @@ void Shader::_populateUniformNameMap()
 	sBuiltiInUniformsNameMap[ "VIEW_DIRECTION" ] = BU_VIEW_DIRECTION;
 	sBuiltiInUniformsNameMap[ "OBJECT_COLOR" ] = BU_OBJECT_COLOR;
 	sBuiltiInUniformsNameMap[ "TIME" ] = BU_TIME;
-	sBuiltiInUniformsNameMap[ "TARGET_DIMENSION" ] = BU_TARGET_DIMENSION;
+	sBuiltiInUniformsNameMap["TARGET_DIMENSION"] = BU_TARGET_DIMENSION;
+	sBuiltiInUniformsNameMap["TARGET_PIXEL"] = BU_TARGET_PIXEL;
 }
 
 void Shader::_populateAttributeNameMap()
@@ -73,12 +74,10 @@ VertexField Shader::_getAttributeForName( const std::string& name )
 	return (elem != sBuiltInAttributeNameMap.end()) ? elem->second : VertexField::None;
 }
 
-Shader::Shader( Dojo::ResourceGroup* creator, const String& filePath ) :
+Shader::Shader( ResourceGroup* creator, const String& filePath ) :
 	Resource( creator, filePath )
 {
 	memset( pProgram, 0, sizeof( pProgram ) ); //init to null
-
-	pRender = Platform::getSingleton()->getRender();
 }
 
 void Shader::_assignProgram( const Table& desc, ShaderProgramType type )
@@ -123,33 +122,43 @@ void Shader::setUniformCallback( const String& nameUTF, const UniformCallback& d
 
 #ifdef DOJO_SHADERS_AVAILABLE
 
-const void* Shader::_getUniformData( const Uniform& uniform, Renderable* user )
+const void* Shader::_getUniformData( const Uniform& uniform, const Renderable& user )
 {
+	auto& r = Platform::singleton().getRenderer();
+
 	static GLint tempInt[2];
+	static Vector tmpVec;
     auto builtin = uniform.builtInUniform;
     switch ( builtin )
     {
 		case BU_NONE:
+			//TODO make global uniforms and remove this stuff
 			return uniform.userUniformCallback( user ); //call the user callback and be happy
 		case BU_WORLD:
-			return &pRender->currentState.world;
+			return &r.currentState.world;
 		case BU_VIEW:
-			return &pRender->currentState.view;
+			return &r.currentState.view;
 		case BU_PROJECTION:
-			return &pRender->currentState.projection;
+			return &r.currentState.projection;
         case BU_WORLDVIEW:
-            return &(pRender->currentState.worldView);
+            return &(r.currentState.worldView);
 		case BU_WORLDVIEWPROJ:
-			return &pRender->currentState.worldViewProjection;
+			return &r.currentState.worldViewProjection;
 		case BU_OBJECT_COLOR:
-			return &user->color;
+			return &user.color;
 		case BU_VIEW_DIRECTION:
-			return &pRender->currentState.viewDirection;
+			return &r.currentState.viewDirection;
 		case BU_TIME:
 			DEBUG_TODO;
 			return nullptr;
 		case BU_TARGET_DIMENSION:
-            return &pRender->currentState.targetDimension;
+            return &r.currentState.targetDimension;
+		case BU_TARGET_PIXEL:
+			tmpVec = {
+				1.f / r.currentState.targetDimension.x,
+				1.f / r.currentState.targetDimension.y 
+			};
+			return &tmpVec;
 		default: //texture stuff
         {
             if( builtin >= BU_TEXTURE_0 && builtin <= BU_TEXTURE_N )
@@ -159,14 +168,14 @@ const void* Shader::_getUniformData( const Uniform& uniform, Renderable* user )
             }
             else if( builtin >= BU_TEXTURE_0_DIMENSION && builtin <= BU_TEXTURE_N_DIMENSION )
             {
-                Texture* t = user->getTexture( builtin - BU_TEXTURE_0_DIMENSION );
+                Texture* t = user.getTexture( builtin - BU_TEXTURE_0_DIMENSION );
                 tempInt[0] = t->getWidth();
                 tempInt[1] = t->getHeight();
                 return &tempInt;
             }
             else if( builtin >= BU_TEXTURE_0_TRANSFORM && builtin <= BU_TEXTURE_N_TRANSFORM )
             {
-                return &user->getTextureUnit( builtin - BU_TEXTURE_0_TRANSFORM )->getTransform();
+                return &user.getTextureUnit( builtin - BU_TEXTURE_0_TRANSFORM ).getTransform();
             }
 			else
 			{
@@ -177,7 +186,7 @@ const void* Shader::_getUniformData( const Uniform& uniform, Renderable* user )
     }
 }
 
-void Shader::use( Renderable* user )
+void Shader::use( const Renderable& user )
 {
 	DEBUG_ASSERT( isLoaded(), "tried to use a Shader that wasn't loaded" );
 
@@ -227,14 +236,13 @@ bool Shader::onLoad()
 	loaded = false;
 
 	//load the descriptor table
-	Table desc;
-	Table::loadFromFile( &desc, filePath );
+	auto desc =	Table::loadFromFile( filePath );
 
 	//compose preprocessor flags
 	mPreprocessorHeader.clear();
-	Table* defines = desc.getTable( "defines" );
+	auto& defines = desc.getTable( "defines" );
 
-	for( auto& entry : *defines )
+	for( auto& entry : defines )
 		mPreprocessorHeader += std::string("#define ") + entry.second->getAsString().ASCII() + "\n";
 
 	//grab all types

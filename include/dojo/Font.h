@@ -27,7 +27,7 @@ namespace Dojo
 	class ResourceGroup;
 	class Tessellation;
 
-	class Font : public Dojo::Resource
+	class Font : public Resource
 	{
 	public:
 
@@ -65,7 +65,7 @@ namespace Dojo
 
 		protected:
 
-			std::unique_ptr< Tessellation > mTesselation;
+			Unique< Tessellation > mTesselation;
 		};
 		
 		///A Page is a single texture which contains FONT_PAGE_SIDE^2 Characters in Unicode
@@ -135,11 +135,6 @@ namespace Dojo
 		///purges all the loaded pages from memory and prompts a rebuild
 		virtual void onUnload( bool soft = false );
 
-		const String& getName()
-		{
-			return fontName;
-		}
-		
 		///returns the maximum width of a character (cell height)
 		int getFontWidth()			{	return fontWidth;	}
 		///returns the maximum height of a character (cell width)
@@ -205,7 +200,6 @@ namespace Dojo
 		
 	protected:
 		
-		String fontName;
 		String fontFile;
 
 		bool antialias, kerning, generateEdge, generateSurface;

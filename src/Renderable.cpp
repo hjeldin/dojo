@@ -14,8 +14,7 @@ Renderable::Renderable( Object* parent, const Vector& pos, Mesh* m ) :
 	visible( true ),
 	layer( INT_MIN ),
 	renderingOrder(0),
-	currentFadeTime(0),
-	mCulled( false )
+	currentFadeTime(0)
 {
 	reset();
 
@@ -27,8 +26,7 @@ Renderable::Renderable( Object* parent, const Vector& pos, const String& meshNam
 	visible( true ),
 	layer(0),
 	renderingOrder(0),
-	currentFadeTime(0),
-	mCulled( false )
+	currentFadeTime(0)
 {
 	reset();
 
@@ -82,13 +80,10 @@ void Renderable::startFade(float startAlpha, float endAlpha, float duration) {
 }
 
 void Renderable::onAction( float dt )
-{    
-	bool previousAABBSetting = mNeedsAABB;
-	mNeedsAABB = false; //override the setting
-		
+{
 	Object::onAction( dt );
-	
-	if( mesh && (mNeedsAABB = previousAABBSetting) )
+
+	if( mesh )
 		_updateWorldAABB( mesh->getMin(), mesh->getMax() );
 	
 	advanceFade(dt);
@@ -125,12 +120,8 @@ void Renderable::advanceFade(float dt) {
 	}
 }
 
-void Renderable::_notifyRenderInfo(Render* r, int layerID, int renderIdx) {
+void Renderable::_notifyRenderInfo(Renderer* r, int layerID, int renderIdx) {
 	render = r;
 	layer = layerID;
 	renderingOrder = renderIdx;
-}
-
-void Renderable::_notifyCulled(bool culled) {
-	mCulled = culled;
 }

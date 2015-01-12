@@ -12,7 +12,7 @@
 
 using namespace Dojo;
 
-Dojo::XInputController::XInputController(int n) :
+XInputController::XInputController(int n) :
 InputDevice(InputDevice::Type::Xbox, n, 16, 8),
 mConnectionCheckTimer(0),
 mConnected(false) {
@@ -23,15 +23,15 @@ mConnected(false) {
 		mDeadZone[AI_RY] = 0.15f;
 }
 
-bool Dojo::XInputController::isConnected() {
+bool XInputController::isConnected() {
 	return mConnected;
 }
 
-bool Dojo::XInputController::hasAxis(Axis a) const  {
+bool XInputController::hasAxis(Axis a) const  {
 	return a < Axis::_AI_COUNT; //TODO change if we add axes
 }
 
-void Dojo::XInputController::poll(float dt) {
+void XInputController::poll(float dt) {
 	XINPUT_STATE state;
 
 	if (!mConnected)
@@ -50,7 +50,7 @@ void Dojo::XInputController::poll(float dt) {
 	if (connected)
 	{
 		if (!mConnected) //yeeeee we're connected!
-			Platform::getSingleton()->getInput()->addDevice(this);
+			Platform::singleton().getInput().addDevice(this);
 
 		int buttonMask = state.Gamepad.wButtons; //wButtons is a mask where each bit represents a button state
 
@@ -78,7 +78,7 @@ void Dojo::XInputController::poll(float dt) {
 	{
 		//notify disconnection to listeners and to the input system
 		_fireDisconnected();
-		Platform::getSingleton()->getInput()->removeDevice(this);
+		Platform::singleton().getInput().removeDevice(this);
 
 		//clear the listeners because dojo's contract is to create a *new* joystick object for each connection
 		pListeners.clear();
